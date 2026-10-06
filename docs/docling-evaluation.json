@@ -1,7 +1,7 @@
 {
   "date": "2026-10-07",
   "parser": "docling 2.134.0 + EasyOCR vi/en (CPU, local models)",
-  "offline_tests": 87,
+  "offline_tests": 88,
   "parser_cases": [
     {
       "case": "docx",
@@ -127,9 +127,10 @@
       "dimensions": 1536,
       "audit": "pass",
       "evidence": 2,
-      "context_tokens": 4853,
+      "context_tokens": 4834,
       "backward_hashes": true,
-      "trace_id": "n00026"
+      "trace_id": "n00026",
+      "model_fingerprint": "3fc1ed5c541505c62fe7ae758107256ee5023d8a0eb81d7534641fa1081fe327"
     },
     {
       "case": "vietnam-ocr",
@@ -138,9 +139,10 @@
       "dimensions": 1536,
       "audit": "pass",
       "evidence": 4,
-      "context_tokens": 5796,
+      "context_tokens": 5869,
       "backward_hashes": true,
-      "trace_id": "n00036"
+      "trace_id": "n00036",
+      "model_fingerprint": "3fc1ed5c541505c62fe7ae758107256ee5023d8a0eb81d7534641fa1081fe327"
     }
   ],
   "visual_findings": [
@@ -339,5 +341,14 @@
       }
     ],
     "limitations": "No independently labeled relevance corpus or factual oracle. Review docs remain unverified. Failed/no-evidence cases are retained."
+  },
+  "retained_failure": {
+    "case": "final-native-table before country-gate fix",
+    "status": "no_evidence",
+    "reason": "Model geography_match=false without requested country; subject and metric both matched. Fixed backend non-applicable country gate; original failure retained locally."
+  },
+  "model_fingerprint_recheck": {
+    "both_sources_converted_again": true,
+    "cache_hit_on_repeat": true
   }
 }

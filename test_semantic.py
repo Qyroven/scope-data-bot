@@ -85,10 +85,61 @@ class SemanticTests(unittest.TestCase):
             rank_request(self.plan | {"brief": self.brief}, candidates, Path("."))
 
     def check(self, result, text):
-        with patch("semantic.structured_request", return_value=(result, {})):
+        with patch("semantic.structured_request", return_value=(copy.deepcopy(result), {})):
             return check_request(
                 self.plan | {"brief": self.brief}, {"title": "Report", "text": text}, Path("."), 1
             )[0]
+
+    def test_unrequested_country_cannot_reject_conceptual_evidence(self):
+        result = {
+            "subject_match": True,
+            "geography_match": False,
+            "contains_data": False,
+            "contains_requested_metric": True,
+            "years": [],
+            "unit": None,
+            "evidence_ids": [0],
+            "missing": [],
+        }
+        plan = {
+            **self.plan,
+            "brief": "Tài liệu về định lý Pythagoras",
+            "content_mode": "conceptual",
+            "country": None,
+            "start_year": None,
+            "end_year": None,
+        }
+        with patch("semantic.structured_request", return_value=(copy.deepcopy(result), {})):
+            checked, _ = check_request(
+                plan,
+                {"title": "Theorem", "text": "Pythagorean theorem applies to right triangles."},
+                Path("."),
+                1,
+            )
+        self.assertEqual(checked["status"], "review")
+        self.assertFalse(checked["geography_match"])
+        self.assertFalse(checked["country_gate_required"])
+        # An explicitly requested country still requires geographic evidence.
+        with patch("semantic.structured_request", return_value=(copy.deepcopy(result), {})):
+            checked, _ = check_request(
+                {**plan, "country": "VN"},
+                {"title": "Theorem", "text": "Pythagorean theorem applies to right triangles."},
+                Path("."),
+                1,
+            )
+        self.assertEqual(checked["status"], "out_of_scope")
+        self.assertTrue(checked["country_gate_required"])
+        # Ignoring a non-applicable country gate must not bypass full-scope subject rejection.
+        with patch(
+            "semantic.structured_request", return_value=({**result, "subject_match": False}, {})
+        ):
+            checked, _ = check_request(
+                plan,
+                {"title": "Different scope", "text": "Unrelated publisher and region."},
+                Path("."),
+                1,
+            )
+        self.assertEqual(checked["status"], "out_of_scope")
 
     def test_fake_quotes_and_years_are_rejected(self):
         base = {
