@@ -67,6 +67,8 @@ Luồng query: kiểm phạm vi câu hỏi → query embedding → cosine + BM25
 
 Không nhét toàn bộ corpus vào prompt. Context bị giới hạn, metadata và đoạn omitted được báo rõ. Mỗi context lưu riêng `data/context-*.json` với trace ID. Scope chỉ là phạm vi corpus; câu hỏi do chatbot nhận sau ingestion.
 
+Embedding cache dùng lại vector khi provider/model/số chiều và văn bản đầu vào giống nhau, kể cả giữa các scope; mỗi run vẫn giữ assessment và nguồn riêng. Các chunk trùng đầu vào trong một run chỉ gửi embedding một lần. `embedding-receipts.json` ghi `cache_hits` và `deduplicated_chunks`. Cache cũ theo scope được chuyển sang khóa mới khi đọc, không cần gọi API lại.
+
 ## Kiểm và truy ngược
 
 ```bash

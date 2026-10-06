@@ -85,10 +85,10 @@ def main():
                 os.environ[name] = str(value)
         from document_parser import parser_options, runtime
 
-        options = parser_options()
-        if options["mode"] == "docling" and not runtime().is_file():
-            raise ValueError("DOCLING_NOT_INSTALLED: run ./setup-parser.sh")
         if folder is None:
+            options = parser_options()
+            if options["mode"] == "docling" and not runtime().is_file():
+                raise ValueError("DOCLING_NOT_INSTALLED: run ./setup-parser.sh")
             brief = args.scope or args.brief_file.read_text(encoding="utf-8")
             _, folder = run_bot(
                 brief,

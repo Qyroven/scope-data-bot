@@ -17,6 +17,25 @@ import test_data_pipeline as fixtures
 
 
 class ReviewRegressions(unittest.TestCase):
+    def test_from_run_does_not_require_parser_runtime_or_reparse(self):
+        from data_bot import main
+
+        with (
+            patch("sys.argv", ["data_bot.py", "--from-run", "existing-run"]),
+            patch("document_parser.parser_options", side_effect=AssertionError("must not parse")),
+            patch("data_bot.run_bot", side_effect=AssertionError("must not crawl")),
+            patch(
+                "data_bot.build",
+                return_value={
+                    "status": "ready_partial",
+                    "chunk_count": 1,
+                    "crawl_status": "needs_review",
+                },
+            ) as build_mock,
+        ):
+            self.assertEqual(main(), 0)
+            self.assertEqual(build_mock.call_args.args[0], Path("existing-run"))
+
     def test_ai_redirect_and_unknown_destination_rejected(self):
         request = urllib.request.Request("https://api.openai.com/v1/responses")
         with self.assertRaisesRegex(ValueError, "redirect"):

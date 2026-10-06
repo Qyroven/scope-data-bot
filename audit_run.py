@@ -1,6 +1,7 @@
 """Independent output audit: hash/locator/content/vector consistency, not factual truth."""
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -82,7 +83,9 @@ def audit(folder):
         == manifest["index_sha256"],
     )
     check("unique chunk IDs", len({c["id"] for c in chunks}) == len(chunks))
-    with sqlite3.connect(f"file:{folder / 'data/index.sqlite'}?mode=ro", uri=True) as db:
+    with closing(
+        sqlite3.connect((folder / "data/index.sqlite").as_uri() + "?mode=ro", uri=True)
+    ) as db:
         rows = {
             ident: (json.loads(metadata), json.loads(vector))
             for ident, metadata, vector in db.execute("SELECT * FROM chunks")

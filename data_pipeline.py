@@ -202,6 +202,26 @@ def make_chunks(folder, trace, limit=500, max_chunks=10000):
         budget = limit - tokens(prefix)
         if budget < 50:
             raise ValueError("Chunk title exceeds budget")
+        # Content/parser identity is constant for every chunk of this document.
+        document_version = digest(
+            json.dumps(
+                {
+                    "raw": doc.get("raw_sha256") or digest(json.dumps(doc, sort_keys=True)),
+                    "parser": doc.get("parser", "worldbank-json-xml-v1"),
+                    "library": doc.get("parser_library_version"),
+                    "config": doc.get("parser_config"),
+                    "chunker": VERSION,
+                    "content": digest(
+                        json.dumps(
+                            {"text": doc.get("text"), "tables": doc.get("tables")},
+                            sort_keys=True,
+                            ensure_ascii=False,
+                        )
+                    ),
+                },
+                sort_keys=True,
+            )
+        )
         sections = []
         if doc.get("pages"):
             sections.extend(
@@ -328,26 +348,7 @@ def make_chunks(folder, trace, limit=500, max_chunks=10000):
                         "prefix": prefix,
                         "tokens": tokens(content),
                         "source_id": digest(doc.get("url", "") or str(path)),
-                        "document_version": digest(
-                            json.dumps(
-                                {
-                                    "raw": doc.get("raw_sha256")
-                                    or digest(json.dumps(doc, sort_keys=True)),
-                                    "parser": doc.get("parser", "worldbank-json-xml-v1"),
-                                    "library": doc.get("parser_library_version"),
-                                    "config": doc.get("parser_config"),
-                                    "chunker": VERSION,
-                                    "content": digest(
-                                        json.dumps(
-                                            {"text": doc.get("text"), "tables": doc.get("tables")},
-                                            sort_keys=True,
-                                            ensure_ascii=False,
-                                        )
-                                    ),
-                                },
-                                sort_keys=True,
-                            )
-                        ),
+                        "document_version": document_version,
                         "parser_version": doc.get("parser", "worldbank-json-xml-v1"),
                         "chunker_version": VERSION,
                         "source_url": doc.get("url"),
@@ -380,6 +381,7 @@ def build(
     request_fn=embedding_request,
 ):
     folder = Path(folder).resolve()
+    profile = provider()
     lineage = json.loads((folder / "lineage.json").read_text())
     trace = TraceStore(folder)
     trace.nodes, trace.issues = lineage["nodes"], lineage["issues"]
@@ -405,14 +407,14 @@ def build(
         cache.execute("CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, vector TEXT)")
         try:
             with trace.stage("embedding", model, parents=[chunks_node["id"]]) as embedded:
-                missing = []
+                missing = {}
+                deduplicated = 0
                 for chunk in chunks:
                     chunk["cache_key"] = digest(
                         json.dumps(
                             [
-                                VERSION,
-                                provider(),
-                                scope.get("brief"),
+                                "embedding-input-v2",
+                                profile,
                                 model,
                                 dimensions,
                                 chunk["text"],
@@ -423,22 +425,50 @@ def build(
                     row = cache.execute(
                         "SELECT vector FROM cache WHERE key=?", (chunk["cache_key"],)
                     ).fetchone()
+                    if row is None:
+                        # Promote an existing scoped cache entry without paying to re-embed it.
+                        legacy_key = digest(
+                            json.dumps(
+                                [
+                                    VERSION,
+                                    profile,
+                                    scope.get("brief"),
+                                    model,
+                                    dimensions,
+                                    chunk["text"],
+                                ],
+                                ensure_ascii=False,
+                            )
+                        )
+                        row = cache.execute(
+                            "SELECT vector FROM cache WHERE key=?", (legacy_key,)
+                        ).fetchone()
+                        if row:
+                            valid_vector(json.loads(row[0]), dimensions)
+                            cache.execute(
+                                "INSERT OR IGNORE INTO cache VALUES (?,?)",
+                                (chunk["cache_key"], row[0]),
+                            )
                     if row:
                         chunk["vector"] = valid_vector(json.loads(row[0]), dimensions)
                         cache_hits += 1
+                    elif chunk["cache_key"] in missing:
+                        deduplicated += 1
                     else:
-                        missing.append(chunk)
+                        missing[chunk["cache_key"]] = chunk
+                cache.commit()
+                unique_missing = list(missing.values())
                 batch_size = (
                     1
-                    if provider() == "btc"
+                    if profile == "btc"
                     and (
                         setting("BTC_EMBEDDING_BATCH_VERIFIED") != "1"
                         or model == "gemini-embedding-2"
                     )
                     else 16
                 )
-                for offset in range(0, len(missing), batch_size):
-                    batch = missing[offset : offset + batch_size]
+                for offset in range(0, len(unique_missing), batch_size):
+                    batch = unique_missing[offset : offset + batch_size]
                     vectors, receipt = request_fn([c["text"] for c in batch], model, dimensions)
                     if len(vectors) != len(batch):
                         raise ValueError("Embedding count mismatch")
@@ -450,11 +480,16 @@ def build(
                             (chunk["cache_key"], json.dumps(vector)),
                         )
                     cache.commit()
+                # Reuse only vectors; source metadata, assessment and trace stay per chunk/run.
+                for chunk in chunks:
+                    if "vector" not in chunk:
+                        chunk["vector"] = missing[chunk["cache_key"]]["vector"]
                 save_json(
                     dest / "embedding-receipts.json",
                     {
                         "requests": receipts,
                         "cache_hits": cache_hits,
+                        "deduplicated_chunks": deduplicated,
                         "model": model,
                         "dimensions": dimensions,
                         "chunk_ids": [c["id"] for c in chunks],
@@ -499,7 +534,7 @@ def build(
             index_node = frozen_artifact(trace, "data/index.sqlite", [indexed["id"]], "index")
         manifest = {
             "version": 1,
-            "provider": provider(),
+            "provider": profile,
             "status": "ready_partial" if chunks else "no_evidence",
             "scope": scope,
             "crawl_status": report.get("status"),
@@ -662,7 +697,7 @@ def retrieve(folder, question, budget=6000, top_k=6, rerank=True, request_fn=emb
         raise ValueError("Query embedding count mismatch")
     query = valid_vector(vectors[0], manifest["dimensions"])
     query_norm = math.sqrt(sum(x * x for x in query))
-    db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    db = sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)
     try:
         config = json.loads(db.execute("SELECT data FROM config").fetchone()[0])
         if config != {"model": manifest["model"], "dimensions": manifest["dimensions"]}:
