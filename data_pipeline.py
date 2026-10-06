@@ -317,7 +317,7 @@ def context_bundle(chunks, manifest, budget):
     return bundle
 
 
-def persist_context(folder, bundle, manifest, selected, query_receipt=None, rerank_evidence=None, gate_evidence=None):
+def persist_context(folder, bundle, manifest, selected, query_receipt=None, rerank_evidence=None, gate_evidence=None, budget=6000):
     lineage = json.loads((folder / "lineage.json").read_text())
     trace = TraceStore(folder)
     trace.nodes, trace.issues = lineage["nodes"], lineage["issues"]
@@ -334,6 +334,8 @@ def persist_context(folder, bundle, manifest, selected, query_receipt=None, rera
     context_node = trace.node("context", "Budgeted evidence handoff", parents=parents)
     bundle["trace_id"] = context_node["id"]
     bundle["context_tokens"] = tokens(json.dumps(bundle, ensure_ascii=False))
+    if tokens(json.dumps(bundle, ensure_ascii=False)) > budget:
+        raise ValueError("Final context exceeds token budget")
     filename = "data/context-" + uuid4().hex[:16] + ".json"
     save_json(folder / filename, bundle)
     trace.artifact(filename, parents=[context_node["id"]], stage="context")
@@ -370,7 +372,7 @@ def retrieve(folder, question, budget=6000, top_k=6, rerank=True, request_fn=emb
             bundle=context_bundle([],manifest,budget-150)
             bundle['retrieval']={'method':'scope gate','reranker':None,'matched_chunks':0,
                                  'no_relevant_evidence':True,'outside_scope':True,'reason':gate['reason']}
-            return persist_context(folder,bundle,manifest,[],gate_evidence=gate_evidence)
+            return persist_context(folder,bundle,manifest,[],gate_evidence=gate_evidence,budget=budget)
     vectors, query_receipt = request_fn([question], manifest["model"], manifest["dimensions"])
     query = valid_vector(vectors[0], manifest["dimensions"])
     db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
@@ -425,7 +427,7 @@ def retrieve(folder, question, budget=6000, top_k=6, rerank=True, request_fn=emb
     bundle = context_bundle(expanded, manifest, budget - 150)
     bundle["retrieval"] = {"method": "dense cosine + FTS5 BM25 + RRF", "reranker": "LLM relevance scoring" if rerank else None,
         "matched_chunks": len(selected), "no_relevant_evidence": not bool(bundle["evidence"])}
-    bundle = persist_context(folder,bundle,manifest,selected[:top_k],query_receipt,rerank_evidence,gate_evidence)
+    bundle = persist_context(folder,bundle,manifest,selected[:top_k],query_receipt,rerank_evidence,gate_evidence,budget)
     if tokens(json.dumps(bundle, ensure_ascii=False)) > budget:
         raise ValueError("Final context exceeds token budget")
     return bundle
