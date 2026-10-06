@@ -13,3 +13,4 @@ runs/
 *.sqlite*
 .data-lock/
 .ai-log/
+local-evidence/

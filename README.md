@@ -77,15 +77,9 @@ Không nhét toàn bộ corpus vào prompt. Context bị giới hạn, metadata 
 .venv/bin/ruff format --check .
 .venv/bin/python audit_run.py --run bot-runs/<id>
 .venv/bin/python trace.py --run bot-runs/<id> --target n00001
-# Tốn API: test live sáu scope, concurrency tối đa 2.
-.venv/bin/python evaluate_live.py --output bot-runs/eval --workers 2
 ```
 
 `audit_run.py` đối chiếu text spans, vị trí hàng/ô, chunks/index, dimensions, token count và hash trên trace. Nó không xác nhận sự thật trong tài liệu hoặc độ trung thực với PDF/HTML đã render. Nơi phát hiện lỗi không tự chứng minh nguyên nhân gốc; feedback chưa tự sửa sự thật.
-
-Kết quả ngày 07/10/2026: **88 tests offline pass**, lint/format và pip check pass. Vòng live mới: Pythagoras 116 chunks; Newton 24; vaccine/miễn dịch 18; đánh giá giáo dục 12. Cả 4 index qua audit/truy ngược và không trả evidence cho probe Bitcoin ngoài scope. Vòng trước gồm cả tuổi thọ và thất bại nguồn biết chữ vẫn lưu riêng. Đây là integration probes, chưa phải benchmark retrieval/factual accuracy. Xem [vòng mới](docs/docling-evaluation.json), [vòng trước](docs/live-evaluation.json) và [review/fixes/giới hạn](docs/REVIEW.md).
-
-Parser đã thử PDF native có bảng, PDF scan không có lớp chữ, ảnh trang tiếng Việt, DOCX/PPTX/XLSX và PDF công thức. Hai corpus parse QA tạo **24 chunks/vector thật 1536 chiều**, qua native-JSON/preservation audit và truy ngược; nguồn QA được cung cấp thủ công, không phải bài test tìm nguồn tự động. Có lỗi model thật: gộp hàng bảng tiếng Anh, OCR bỏ sót ô `2,7` và mất chữ tiếng Việt. Các lỗi quan sát được ghi trong báo cáo; bot giữ null/cảnh báo, không tự điền số. Scan/layout/OCR không được coi là đã xác minh vì parse chạy thành công.
 
 ## Giới hạn hiện tại
 
@@ -93,8 +87,8 @@ Parser nhẹ cho HTML/CSV/JSON; Docling local cho PDF, PNG/JPEG/TIFF/WebP một 
 
 `.env.example` yêu cầu Docling. `DOCUMENT_PARSER=auto` dùng Docling khi runtime đã cài; nếu chưa có thì PDF dùng pypdf và ghi hạn chế rõ, ảnh/Office báo cần setup. `--parser native` chọn pypdf. Native long PDF vẫn giữ tối đa 24 trang theo scope (scan tối đa 500 trang/45 giây). Cache parse local theo raw/config/worker/dependency-lock, không cache assessment; không bị lẫn scope. Cache không phải kho bằng chứng: từng run vẫn giữ raw/parsed và trace riêng.
 
-Formula enrichment, mô tả ảnh/biểu đồ và chữ viết tay chưa được kiểm chứng; chưa bật các model enrichment nặng. Không có cam kết đọc đúng mọi công thức/bảng, hay mọi ngôn ngữ. Nguồn chặn/JavaScript/định dạng không hỗ trợ giữ lỗi. Tham khảo API sử dụng tại [Docling OCR](https://docling-project.github.io/docling/_generated/examples/full_page_ocr/) và [offline/local models](https://docling-project.github.io/docling/usage/advanced_options/).
+OCR có thể mất chữ hoặc đọc sai ô bảng; cần kiểm lại nguồn trước khi dùng số liệu. Cờ chất lượng và giá trị null không bảo đảm đã phát hiện mọi lỗi. Formula enrichment, mô tả ảnh/biểu đồ và chữ viết tay chưa được kiểm chứng; chưa bật các model enrichment nặng. Không có cam kết đọc đúng mọi công thức/bảng, hay mọi ngôn ngữ. Nguồn chặn/JavaScript/định dạng không hỗ trợ giữ lỗi. Tham khảo API sử dụng tại [Docling OCR](https://docling-project.github.io/docling/_generated/examples/full_page_ocr/) và [offline/local models](https://docling-project.github.io/docling/usage/advanced_options/).
 
 Một writer cho mỗi run; operation đồng thời báo RUN_BUSY. Crash có thể để .data-lock, cần kiểm run trước khi xóa lock cũ. Exact vector search phù hợp corpus nhỏ. Đây là CLI đơn người dùng, chưa có UI, tenant ACL hoặc egress sandbox cho dịch vụ crawl công khai. Chỉ nhận nguồn công khai; không đưa tài liệu cá nhân vào repo.
 
-Repo không chứa key, raw pages, vectors, private guide hay thư mục các lượt chạy. Public chỉ có code, fixtures kiểm logic và summary đã bỏ đường dẫn máy cá nhân. GitHub CI kiểm offline trên Python 3.12/3.14, không gọi inference bằng key thật.
+Repo không chứa key, raw pages, vectors, private guide hay thư mục các lượt chạy. Public giữ code, hướng dẫn sử dụng, test hồi quy và CI. Báo cáo thử nghiệm, review và script chạy benchmark live giữ local trong `local-evidence/` (không được Git theo dõi). `benchmarks/vietnam-population-2020-2024.json` là dữ liệu đối chiếu mà connector World Bank sử dụng khi chạy; cần giữ cùng code. GitHub CI kiểm offline trên Python 3.12/3.14, không gọi inference bằng key thật.
