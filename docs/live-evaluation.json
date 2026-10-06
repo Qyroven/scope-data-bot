@@ -1,0 +1,242 @@
+{
+  "tested_on": "2026-10-07 Asia/Ho_Chi_Minh",
+  "type": "live_integration_not_factual_accuracy_benchmark",
+  "offline_tests": 73,
+  "results": [
+    {
+      "case": "education_statistics",
+      "scope": "Thu thập số liệu tỷ lệ biết chữ của người từ 15 tuổi trở lên tại Việt Nam 2020-2022, mẫu số là tổng dân số từ 15 tuổi trở lên.",
+      "status": "no_evidence",
+      "crawl_status": "incomplete",
+      "mode": "statistical",
+      "counts": {
+        "failed": 3
+      },
+      "candidates": 5,
+      "chunks": 0,
+      "ambiguities": [],
+      "crawl_error": null,
+      "seconds": 15.89,
+      "local_run_id": "20261006T170633141020Z-16dcda3ef8"
+    },
+    {
+      "case": "health_statistics",
+      "scope": "Thu thập số liệu tuổi thọ kỳ vọng khi sinh, cả hai giới tại Việt Nam 2020-2022.",
+      "status": "ready_partial",
+      "crawl_status": "needs_review",
+      "mode": "statistical",
+      "counts": {
+        "review": 1
+      },
+      "candidates": 1,
+      "chunks": 61,
+      "ambiguities": [],
+      "crawl_error": null,
+      "context_evidence": 3,
+      "context_tokens": 4511,
+      "trace_id": "n00097",
+      "trace_stages": [
+        "check",
+        "chunk",
+        "context",
+        "crawl",
+        "discovery",
+        "embedding",
+        "index",
+        "parse",
+        "query_scope",
+        "reranking",
+        "retrieval",
+        "save",
+        "scope",
+        "search"
+      ],
+      "integrity_pass": true,
+      "preservation_audit": "pass",
+      "off_topic_evidence": 0,
+      "off_topic_abstained": true,
+      "quality": [
+        "review"
+      ],
+      "seconds": 37.33,
+      "local_run_id": "20261006T170633141277Z-4029781a64"
+    },
+    {
+      "case": "mathematics",
+      "scope": "Thu thập tài liệu giảng dạy về định lý Pythagoras: phát biểu, điều kiện tam giác vuông, chứng minh và ví dụ.",
+      "status": "ready_partial",
+      "crawl_status": "needs_review",
+      "mode": "conceptual",
+      "counts": {
+        "review": 3
+      },
+      "candidates": 9,
+      "chunks": 126,
+      "ambiguities": [],
+      "crawl_error": null,
+      "context_evidence": 3,
+      "context_tokens": 5641,
+      "trace_id": "n00335",
+      "trace_stages": [
+        "check",
+        "chunk",
+        "context",
+        "crawl",
+        "discovery",
+        "embedding",
+        "index",
+        "parse",
+        "query_scope",
+        "reranking",
+        "retrieval",
+        "save",
+        "scope",
+        "search"
+      ],
+      "integrity_pass": true,
+      "off_topic_evidence": 0,
+      "off_topic_abstained": true,
+      "quality": [
+        "review"
+      ],
+      "seconds": 56.7,
+      "preservation_audit": "pass",
+      "local_run_id": "20261006T170121842592Z-61bb71a155"
+    },
+    {
+      "case": "physics",
+      "scope": "Thu thập tài liệu giáo trình về định luật thứ hai Newton, F = ma, điều kiện áp dụng, đơn vị lực và ví dụ.",
+      "status": "ready_partial",
+      "crawl_status": "needs_review",
+      "mode": "conceptual",
+      "counts": {
+        "review": 2,
+        "failed": 1
+      },
+      "candidates": 8,
+      "chunks": 27,
+      "ambiguities": [],
+      "crawl_error": null,
+      "context_evidence": 1,
+      "context_tokens": 3652,
+      "trace_id": "n00125",
+      "trace_stages": [
+        "check",
+        "chunk",
+        "context",
+        "crawl",
+        "discovery",
+        "embedding",
+        "index",
+        "parse",
+        "query_scope",
+        "reranking",
+        "retrieval",
+        "save",
+        "scope",
+        "search"
+      ],
+      "integrity_pass": true,
+      "off_topic_evidence": 0,
+      "off_topic_abstained": true,
+      "quality": [
+        "review"
+      ],
+      "seconds": 45.88,
+      "preservation_audit": "pass",
+      "local_run_id": "20261006T170134840373Z-f0c6f658fd"
+    },
+    {
+      "case": "health_concepts",
+      "scope": "Thu thập tài liệu giải thích nguyên lý vaccine và miễn dịch cộng đồng từ WHO, phân biệt phòng nhiễm và phòng bệnh nặng.",
+      "status": "ready_partial",
+      "crawl_status": "needs_review",
+      "mode": "conceptual",
+      "counts": {
+        "review": 3
+      },
+      "candidates": 4,
+      "chunks": 15,
+      "ambiguities": [],
+      "crawl_error": null,
+      "context_evidence": 3,
+      "context_tokens": 5678,
+      "trace_id": "n00104",
+      "trace_stages": [
+        "check",
+        "chunk",
+        "context",
+        "crawl",
+        "discovery",
+        "embedding",
+        "index",
+        "parse",
+        "query_scope",
+        "reranking",
+        "retrieval",
+        "save",
+        "scope",
+        "search"
+      ],
+      "integrity_pass": true,
+      "off_topic_evidence": 0,
+      "off_topic_abstained": true,
+      "quality": [
+        "review"
+      ],
+      "seconds": 32.45,
+      "preservation_audit": "pass",
+      "local_run_id": "20261006T170218542238Z-6bbd2ae28a"
+    },
+    {
+      "case": "education_concepts",
+      "scope": "Thu thập tài liệu giải thích formative assessment và summative assessment trong giáo dục, định nghĩa, khác biệt và ví dụ.",
+      "status": "ready_partial",
+      "crawl_status": "needs_review",
+      "mode": "conceptual",
+      "counts": {
+        "failed": 2,
+        "review": 1
+      },
+      "candidates": 3,
+      "chunks": 1,
+      "ambiguities": [],
+      "crawl_error": null,
+      "context_evidence": 1,
+      "context_tokens": 1647,
+      "trace_id": "n00064",
+      "trace_stages": [
+        "check",
+        "chunk",
+        "context",
+        "crawl",
+        "discovery",
+        "embedding",
+        "index",
+        "parse",
+        "query_scope",
+        "reranking",
+        "retrieval",
+        "save",
+        "scope",
+        "search"
+      ],
+      "integrity_pass": true,
+      "off_topic_evidence": 0,
+      "off_topic_abstained": true,
+      "quality": [
+        "review"
+      ],
+      "seconds": 34.67,
+      "preservation_audit": "pass",
+      "local_run_id": "20261006T170220724705Z-b9ddb8a148"
+    }
+  ],
+  "limitations": [
+    "All generic evidence remains review; no independent factual oracle.",
+    "WHO/academic/category hints do not independently certify assertions.",
+    "Education literacy statistics still has no evidence in the final discovery run; source DNS failures retained.",
+    "BTC adapters are gated and not tested with a BTC key.",
+    "No raw pages, vector dumps, private guide, credentials or local run directories are published."
+  ]
+}
