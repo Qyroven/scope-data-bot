@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,17 +15,19 @@ from data_pipeline import (
     valid_vector,
     context_bundle,
     embedding_request,
+    digest,
+    VERSION,
 )
 
 
 class DataTests(unittest.TestCase):
-    def setup_run(self, root, status="review"):
-        folder = root / "run"
+    def setup_run(self, root, status="review", run_name="run", brief="Mưa Thái Lan 2020-2021"):
+        folder = root / run_name
         (folder / "parsed").mkdir(parents=True)
         (folder / "raw").mkdir()
         save_json(
             folder / "scope.json",
-            {"brief": "Mưa Thái Lan 2020-2021", "ambiguities": ["Thiếu tỉnh"]},
+            {"brief": brief, "ambiguities": ["Thiếu tỉnh"]},
         )
         save_json(folder / "report.json", {"status": "needs_review"})
         trace = TraceStore(folder)
@@ -92,6 +95,102 @@ class DataTests(unittest.TestCase):
             )
             receipt = json.loads((folder / "data/embedding-receipts.json").read_text())
             self.assertEqual(receipt["cache_hits"], 1)
+
+    def test_identical_embedding_inputs_reused_across_scopes_with_separate_provenance(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            first = self.setup_run(root)
+            second = self.setup_run(root, run_name="second", brief="Lượng mưa Thái Lan 2020")
+            build(first, dimensions=2, request_fn=self.fake_embed)
+            build(second, dimensions=2, request_fn=lambda *args: self.fail("duplicate API input"))
+            receipt = json.loads((second / "data/embedding-receipts.json").read_text())
+            self.assertEqual(receipt["cache_hits"], 1)
+            self.assertEqual(receipt["requests"], [])
+            context = retrieve(second, "rainfall", rerank=False, request_fn=self.fake_embed)
+            self.assertEqual(context["scope"]["brief"], "Lượng mưa Thái Lan 2020")
+            self.assertTrue(
+                all(
+                    n["artifact_integrity"] is not False
+                    for n in explain(second, context["trace_id"])["backward_trace"]
+                )
+            )
+            # Model, dimensions, provider and actual text remain separate cache contracts.
+            for model, dims, profile in [
+                ("other-model", 2, "openai"),
+                ("text-embedding-3-small", 3, "openai"),
+                ("text-embedding-3-small", 2, "btc"),
+            ]:
+                with patch("data_pipeline.provider", return_value=profile):
+                    calls = []
+
+                    def embed(texts, model, dims, calls=calls):
+                        calls.extend(texts)
+                        return self.fake_embed(texts, model, dims)
+
+                    build(second, model=model, dimensions=dims, request_fn=embed)
+                    self.assertEqual(len(calls), 1)
+
+    def test_legacy_scoped_cache_is_promoted_without_an_api_call(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            folder = self.setup_run(root)
+            doc = json.loads((folder / "parsed/document-001.json").read_text())
+            scope = json.loads((folder / "scope.json").read_text())
+            key = digest(
+                json.dumps(
+                    [
+                        VERSION,
+                        "openai",
+                        scope["brief"],
+                        "text-embedding-3-small",
+                        2,
+                        doc["title"] + "\n" + doc["text"],
+                    ],
+                    ensure_ascii=False,
+                )
+            )
+            from contextlib import closing
+
+            with closing(sqlite3.connect(root / "embedding-cache.sqlite")) as db:
+                db.execute("CREATE TABLE cache(key TEXT PRIMARY KEY, vector TEXT)")
+                db.execute("INSERT INTO cache VALUES (?,?)", (key, "[1, 0]"))
+                db.commit()
+            build(folder, dimensions=2, request_fn=lambda *args: self.fail("legacy cache miss"))
+            second = self.setup_run(root, run_name="other-scope", brief="Rainfall Thailand")
+            build(
+                second, dimensions=2, request_fn=lambda *args: self.fail("promotion not committed")
+            )
+
+    def test_duplicate_chunks_embed_once_but_keep_both_source_records(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = self.setup_run(Path(name))
+            doc = json.loads((folder / "parsed/document-001.json").read_text())
+            doc["url"] = "https://example.org/second-source"
+            save_json(folder / "parsed/document-002.json", doc)
+            calls = []
+
+            def embed(texts, model, dims):
+                calls.extend(texts)
+                return self.fake_embed(texts, model, dims)
+
+            manifest = build(folder, dimensions=2, request_fn=embed)
+            self.assertEqual(manifest["chunk_count"], 2)
+            self.assertEqual(len(calls), 1)
+            receipt = json.loads((folder / "data/embedding-receipts.json").read_text())
+            self.assertEqual(receipt["deduplicated_chunks"], 1)
+            chunks = json.loads((folder / "data/chunks.json").read_text())
+            self.assertEqual(len({c["source_url"] for c in chunks}), 2)
+            self.assertEqual(len({c["trace_id"] for c in chunks}), 2)
+
+    def test_reserved_path_characters_work_for_retrieval_and_audit(self):
+        from audit_run import audit
+
+        with tempfile.TemporaryDirectory() as name:
+            folder = self.setup_run(Path(name) / "dữ liệu #1?100%")
+            build(folder, dimensions=2, request_fn=self.fake_embed)
+            result = retrieve(folder, "rainfall", rerank=False, request_fn=self.fake_embed)
+            self.assertTrue(result["evidence"])
+            self.assertEqual(audit(folder)["status"], "pass")
 
     def test_failed_rebuild_revokes_serving_manifest(self):
         with tempfile.TemporaryDirectory() as name:
