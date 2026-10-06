@@ -2,6 +2,10 @@
 .env.*
 !.env.example
 .venv/
+.venv-docling/
+.parser-cache/
+.parser-models.json
+.ruff_cache/
 __pycache__/
 *.py[cod]
 bot-runs/

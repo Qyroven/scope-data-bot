@@ -1,4 +1,5 @@
 """Persisted provenance DAG, error evidence and bounded repair recommendations."""
+
 import argparse
 import hashlib
 import json
@@ -19,18 +20,43 @@ class EvidenceError(ValidationError):
 def remediation(code, stage):
     rules = {
         "AUTH_FAILED": ("search", "Sửa cấu hình key rồi chạy lại tìm nguồn; không retry key sai."),
-        "COUNTRY_MISMATCH": ("discovery", "Loại nguồn sai quốc gia hoặc sửa mapping scope sau khi kiểm tra."),
-        "INDICATOR_MISMATCH": ("discovery", "Chọn lại chỉ số khớp định nghĩa; không đổi số liệu để vượt gate."),
-        "MISSING_YEARS": ("discovery", "Tìm nguồn bổ sung đủ năm; giữ null/thiếu, không tự điền 0."),
-        "INVALID_VALUE": ("parse", "So sánh ô dữ liệu với bản gốc; nếu nguồn cũng thiếu thì tìm nguồn khác."),
+        "COUNTRY_MISMATCH": (
+            "discovery",
+            "Loại nguồn sai quốc gia hoặc sửa mapping scope sau khi kiểm tra.",
+        ),
+        "INDICATOR_MISMATCH": (
+            "discovery",
+            "Chọn lại chỉ số khớp định nghĩa; không đổi số liệu để vượt gate.",
+        ),
+        "MISSING_YEARS": (
+            "discovery",
+            "Tìm nguồn bổ sung đủ năm; giữ null/thiếu, không tự điền 0.",
+        ),
+        "INVALID_VALUE": (
+            "parse",
+            "So sánh ô dữ liệu với bản gốc; nếu nguồn cũng thiếu thì tìm nguồn khác.",
+        ),
         "DUPLICATE_YEAR": ("parse", "Kiểm tra bản gốc và phép ghép dòng trước khi loại trùng."),
         "OUT_OF_SCOPE_YEAR": ("parse", "Kiểm tra filter thời gian và dòng gốc."),
-        "CROSSCHECK_MISMATCH": ("parse", "Đối chiếu hai bản tải và phiên bản dataset; chưa xác định parser hay nguồn sai."),
-        "SOURCE_REVISION": ("check", "Review thay đổi nguồn so với snapshot; không tự sửa benchmark."),
+        "CROSSCHECK_MISMATCH": (
+            "parse",
+            "Đối chiếu hai bản tải và phiên bản dataset; chưa xác định parser hay nguồn sai.",
+        ),
+        "SOURCE_REVISION": (
+            "check",
+            "Review thay đổi nguồn so với snapshot; không tự sửa benchmark.",
+        ),
     }
-    restart, action = rules.get(code, (stage, "Kiểm tra bằng chứng và sửa công đoạn phát hiện lỗi trước khi chạy lại."))
-    return {"restart_from": restart, "action": action, "status": "pending",
-            "max_attempts": 2, "auto_modify_facts": False}
+    restart, action = rules.get(
+        code, (stage, "Kiểm tra bằng chứng và sửa công đoạn phát hiện lỗi trước khi chạy lại.")
+    )
+    return {
+        "restart_from": restart,
+        "action": action,
+        "status": "pending",
+        "max_attempts": 2,
+        "auto_modify_facts": False,
+    }
 
 
 class TraceStore:
@@ -42,9 +68,15 @@ class TraceStore:
         existing = {node["id"] for node in self.nodes}
         if any(parent not in existing for parent in parents):
             raise ValueError("Lineage parent does not exist")
-        node = {"id": f"n{len(self.nodes)+1:05d}", "stage": stage, "label": label,
-                "parents": parents, "refs": refs or {}, "status": status,
-                "at": datetime.now(timezone.utc).isoformat()}
+        node = {
+            "id": f"n{len(self.nodes) + 1:05d}",
+            "stage": stage,
+            "label": label,
+            "parents": parents,
+            "refs": refs or {},
+            "status": status,
+            "at": datetime.now(timezone.utc).isoformat(),
+        }
         self.nodes.append(node)
         self.save()
         return node
@@ -63,12 +95,18 @@ class TraceStore:
                 code = getattr(error, "code", "STAGE_ERROR")
                 if getattr(error, "code", None) in (401, 403):
                     code = "AUTH_FAILED"
-                issue = {"id": f"e{len(self.issues)+1:05d}", "code": str(code),
-                    "detected_at": node["id"], "detected_stage": stage, "message": str(error),
+                issue = {
+                    "id": f"e{len(self.issues) + 1:05d}",
+                    "code": str(code),
+                    "detected_at": node["id"],
+                    "detected_stage": stage,
+                    "message": str(error),
                     "locator": getattr(error, "locator", None),
                     "expected": getattr(error, "expected", None),
                     "observed": getattr(error, "observed", None),
-                    "cause_status": "unconfirmed", "repair": remediation(str(code), stage)}
+                    "cause_status": "unconfirmed",
+                    "repair": remediation(str(code), stage),
+                }
                 self.issues.append(issue)
                 issue_id = issue["id"]
                 try:
@@ -85,13 +123,29 @@ class TraceStore:
 
     def artifact(self, path, parents=None, locator=None, stage="save"):
         raw = (self.folder / path).read_bytes()
-        return self.node(stage, path, parents, {"path": path, "sha256": hashlib.sha256(raw).hexdigest(),
-                         "bytes": len(raw), "locator": locator})
+        return self.node(
+            stage,
+            path,
+            parents,
+            {
+                "path": path,
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "bytes": len(raw),
+                "locator": locator,
+            },
+        )
 
     def save(self):
-        save_json(self.folder / "lineage.json", {"version": 1, "nodes": self.nodes, "issues": self.issues})
-        save_json(self.folder / "feedback.json", {"issues": self.issues,
-                  "note": "Detected stage is evidence, not proof of root cause. Repairs remain pending until rerun and revalidation."})
+        save_json(
+            self.folder / "lineage.json", {"version": 1, "nodes": self.nodes, "issues": self.issues}
+        )
+        save_json(
+            self.folder / "feedback.json",
+            {
+                "issues": self.issues,
+                "note": "Detected stage is evidence, not proof of root cause. Repairs remain pending until rerun and revalidation.",
+            },
+        )
 
 
 def explain(folder, target):
@@ -102,6 +156,7 @@ def explain(folder, target):
     if node_id not in by_id:
         raise ValueError("Unknown node/error ID")
     order, visited = [], set()
+
     def walk(current):
         if current in visited:
             return
@@ -112,18 +167,26 @@ def explain(folder, target):
             path = (folder / node["refs"]["path"]).resolve()
             if not path.is_relative_to(folder.resolve()):
                 raise ValueError("Artifact path outside run folder")
-            integrity = path.exists() and hashlib.sha256(path.read_bytes()).hexdigest() == node["refs"]["sha256"]
+            integrity = (
+                path.exists()
+                and hashlib.sha256(path.read_bytes()).hexdigest() == node["refs"]["sha256"]
+            )
         order.append({**node, "artifact_integrity": integrity})
         for parent in node["parents"]:
             walk(parent)
+
     walk(node_id)
     affected = {node_id}
     for node in graph["nodes"]:
         if any(parent in affected for parent in node["parents"]):
             affected.add(node["id"])
-    return {"target": target, "issue": issue, "backward_trace": order,
-            "affected_descendants": sorted(affected - {node_id}),
-            "cause_warning": "Chuỗi bằng chứng chỉ ra nơi phát hiện lỗi; nguyên nhân gốc có thể cần đối chiếu thêm."}
+    return {
+        "target": target,
+        "issue": issue,
+        "backward_trace": order,
+        "affected_descendants": sorted(affected - {node_id}),
+        "cause_warning": "Chuỗi bằng chứng chỉ ra nơi phát hiện lỗi; nguyên nhân gốc có thể cần đối chiếu thêm.",
+    }
 
 
 if __name__ == "__main__":
