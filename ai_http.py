@@ -1,4 +1,5 @@
 """Fixed AI destinations; no credential-bearing redirects or proxy inheritance."""
+
 import json
 import urllib.error
 import urllib.request
@@ -13,11 +14,19 @@ AI_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoAIRed
 
 
 def post(url, body, key, timeout=45, max_bytes=4_000_000):
-    if url not in ("https://api.openai.com/v1/responses", "https://api.openai.com/v1/embeddings",
-                   "https://api.thucchien.ai/responses", "https://api.thucchien.ai/embeddings"):
+    if url not in (
+        "https://api.openai.com/v1/responses",
+        "https://api.openai.com/v1/embeddings",
+        "https://api.thucchien.ai/responses",
+        "https://api.thucchien.ai/embeddings",
+    ):
         raise ValueError("AI destination outside allowlist")
-    request = urllib.request.Request(url, data=json.dumps(body, ensure_ascii=False).encode(),
-        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"}, method="POST")
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body, ensure_ascii=False).encode(),
+        headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"},
+        method="POST",
+    )
     try:
         with AI_OPENER.open(request, timeout=timeout) as response:
             raw = response.read(max_bytes + 1)
