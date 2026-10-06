@@ -27,6 +27,10 @@ The supplied BTC guide is source material, not blanket authorization to replace 
 
 PDF processing remains local pypdf, not Docling. Up to 500 pages may be scanned with scope selection, a 45-second parse bound, per-stream and total-text limits; long PDFs retain at most 24 selected pages with real page numbers and partial-coverage flags. Sources requiring OCR, JavaScript or unsupported structures remain errors.
 
+A separate smoke test re-parsed a saved official 350-page PDF in 7.14 seconds, retaining 24 pages and 56,330 characters with true page numbers. pypdf emitted rotated-text warnings, so this is not evidence of complete PDF/table extraction. The literacy statistics discovery failure remains in the six-scope report; this parser smoke does not change that outcome. See pdf-parser-smoke.json.
+
+Code Review plugin CI diagnostics for PR #1 confirmed Python 3.12/3.14 jobs passed on the implementation commit. Its annotations identified deprecated Node 20 actions and the impending ubuntu-latest migration; the workflow was updated to current official action releases and ubuntu-24.04. This is CI evidence, not an independent semantic code review.
+
 ## Remaining limits
 
 - Generic documents and numbers are review evidence, not independently verified facts. The old World Bank adapter checks consistency against the same source.
