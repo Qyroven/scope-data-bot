@@ -199,7 +199,7 @@ function renderDetail(doc) {
   detail.append(el('div', { class: 'quality-card' }, el('div', { class: 'quality-top' }, 'Chất lượng trích xuất', el('strong', {}, score, el('small', {}, ' /100'))), el('meter', { class: 'quality-meter', 'aria-label': 'Chất lượng trích xuất', min: 0, max: 100, value: score }, score), el('p', {}, 'Điểm kiểm tra cấu trúc và khả năng trích xuất; không phải xác suất nội dung đúng.'), el('div', { class: 'confidence' }, el('span', {}, 'Tính đúng của nội dung'), el('strong', {}, 'Chưa được kiểm chứng'))));
   const tabs = el('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Chi tiết nguồn' }), body = el('div', { class: 'detail-body' });
   const panels = {}, tabButtons = {};
-  for (const [key, label] of [['content', 'Nội dung'], ['original', 'Nguồn gốc'], ['chunks', `Đoạn truy hồi (${doc.chunks?.length || 0})`], ['audit', 'Lịch sử']]) {
+  for (const [key, label] of [['content', 'Nội dung'], ['original', 'Nguồn gốc'], ['chunks', `Đoạn xem trước (${doc.chunks?.length || 0})`], ['audit', 'Lịch sử']]) {
     panels[key] = el('div', { id: `detail-${key}`, role: 'tabpanel', 'aria-labelledby': `detail-tab-${key}`, hidden: key !== 'content' });
     const tab = button(label, () => activateTab(key), ''); tab.id = `detail-tab-${key}`; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `detail-${key}`); tab.setAttribute('aria-selected', String(key === 'content')); tab.tabIndex = key === 'content' ? 0 : -1;
     tabButtons[key] = tab; tabs.append(tab); body.append(panels[key]);
@@ -226,7 +226,8 @@ function renderDetail(doc) {
   const sourceURL = safeURL(doc.source_url), sourceInfo = el('dl', { class: 'source-meta' });
   for (const [label, value] of [['Loại nguồn', kinds[doc.source_kind]], ['Tệp', doc.filename], ['Nguồn web', sourceURL], ['Tiếp nhận', formatDate(doc.created_at)], ['SHA-256', doc.source_sha256]]) if (value) sourceInfo.append(el('dt', {}, label), el('dd', {}, value));
   panels.original.append(sourceInfo);
-  if (!doc.chunks?.length) panels.chunks.append(el('p', { class: 'readonly-note' }, 'Chưa có đoạn truy hồi được tạo.'));
+  panels.chunks.append(el('p', { class: 'readonly-note' }, 'Các đoạn này phục vụ duyệt nội dung và tra cứu từ khóa local. Bước Tạo index tạo riêng các chunk theo cấu trúc nguồn để embedding.'));
+  if (!doc.chunks?.length) panels.chunks.append(el('p', { class: 'readonly-note' }, 'Chưa có đoạn xem trước được tạo.'));
   for (const [index, chunk] of (doc.chunks || []).entries()) panels.chunks.append(el('article', { class: 'chunk-card' }, el('header', {}, el('strong', {}, `Đoạn ${String(index + 1).padStart(2, '0')}`), el('span', {}, chunk.tokens ? `${chunk.tokens} token` : '')), el('pre', { class: 'chunk-text' }, chunk.text), el('small', { class: 'field-hint' }, locationLabel(chunk.locator))));
   for (const entry of [...(doc.audit || [])].reverse()) panels.audit.append(el('div', { class: 'audit-entry' }, el('strong', {}, entry.action === 'approve' && entry.approval_mode === 'automatic' ? 'Duyệt tự động theo quy tắc' : (actions[entry.action] || entry.action)), el('small', {}, `${entry.actor === 'local-operator' ? 'Người vận hành cục bộ' : entry.actor || 'Hệ thống'} · ${formatDate(entry.at)}`), entry.note ? el('p', {}, entry.note) : null));
   if (!doc.audit?.length) panels.audit.append(el('p', { class: 'readonly-note' }, 'Chưa có hoạt động được ghi nhận.'));
