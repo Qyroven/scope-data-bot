@@ -25,6 +25,10 @@ def safe_error(error):
     }
     if message in known:
         return known[message]
+    if message.startswith("Không thể tìm nguồn: mọi truy vấn đã thất bại."):
+        if "Search bị CAPTCHA" in message:
+            return "Tìm nguồn bị CAPTCHA; dừng để tránh lặp yêu cầu. Xem trace và chọn provider tìm kiếm hợp lệ."
+        return "Mọi truy vấn tìm nguồn đều thất bại. Xem discovery.json và trace để biết lỗi từng truy vấn."
     http = re.fullmatch(r"AI_HTTP_(\d{3}): request failed; provider body omitted", message)
     if http:
         code = http[1]

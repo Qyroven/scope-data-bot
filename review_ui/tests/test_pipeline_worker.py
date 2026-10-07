@@ -24,6 +24,13 @@ def test_unknown_provider_messages_are_not_persisted():
     assert "HTTPS" in safe_error(ValueError("AI_NETWORK_ERROR: request failed"))
 
 
+def test_discovery_blocker_is_visible_without_echoing_untrusted_details():
+    message = "Không thể tìm nguồn: mọi truy vấn đã thất bại. Search bị CAPTCHA private-key"
+    result = safe_error(ValueError(message))
+    assert "CAPTCHA" in result
+    assert "private-key" not in result
+
+
 def test_native_crawl_keeps_upstream_functions_and_capability_gate(tmp_path):
     program = """import json,sys,ssl,urllib.request
 from pathlib import Path

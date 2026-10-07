@@ -188,6 +188,8 @@ def extract(body: bytes, mime: str, filename: str) -> dict:
 
 PARSER_FIELDS = (
     "text",
+    "html_leads",
+    "html_math",
     "pages",
     "tables",
     "docling_document",

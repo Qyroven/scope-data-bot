@@ -50,6 +50,24 @@ class BotTests(unittest.TestCase):
         self.assertEqual(second["topic"], "life expectancy")
         self.assertNotEqual(second["queries"], self.plan["queries"])
 
+    def test_queries_follow_scope_without_forcing_dataset_terms_on_concepts(self):
+        for scope in (
+            "đồ giả hàng nhái ở Việt Nam 2009-2016",
+            "ô nhiễm thế giới 2005-2011",
+        ):
+            with self.subTest(scope=scope):
+                plan = plan_scope(scope)
+                self.assertEqual(plan["scope_kind"], "statistical")
+                self.assertIn("số liệu thống kê", plan["queries"][1])
+        for scope in (
+            "định lý Pythagoras: phát biểu, chứng minh và điều kiện áp dụng",
+            "cơ chế vaccine tạo miễn dịch và giới hạn hiệu quả",
+        ):
+            with self.subTest(scope=scope):
+                plan = plan_scope(scope)
+                self.assertEqual(plan["scope_kind"], "conceptual")
+                self.assertFalse(any("dataset csv" in query for query in plan["queries"]))
+
     def test_vague_task_does_not_invent_scope(self):
         with self.assertRaises(ValidationError):
             plan_scope("đề F")
@@ -93,6 +111,72 @@ class BotTests(unittest.TestCase):
         for document in ("<div class='anomaly-modal'>Challenge</div>", "<html>No results</html>"):
             with self.subTest(document=document), self.assertRaises(ValidationError):
                 search_links(document)
+
+    def test_html_article_lead_keeps_source_number_and_locator(self):
+        lead = "The opening lead reports 29,403 source cases for 2016, a critical number that must survive parser extraction."
+        paragraphs = "".join(
+            f"<p>Section {i}: Source body discusses original evidence, method {i}, and the details of document review.</p>"
+            for i in range(10)
+        )
+        source = (
+            '<article><h1>Test document</h1><div class="article-brief">'
+            + lead
+            + '</div><div class="article-body">'
+            + paragraphs
+            + "</div></article>"
+        )
+        document = extract_document(
+            source.encode(), "text/html", "utf-8", "https://example.org/report"
+        )
+        self.assertIn("29,403", document["text"])
+        self.assertEqual(document["parser"], "trafilatura+html-tables-v2")
+        self.assertEqual(document["html_leads"][0]["text"], lead)
+        self.assertEqual(
+            document["text"][
+                document["html_leads"][0]["char_start"] : document["html_leads"][0]["char_end"]
+            ],
+            lead,
+        )
+        self.assertIn("/article", document["html_leads"][0]["locator"])
+
+    def test_html_mathml_keeps_formula_and_original_markup(self):
+        paragraphs = "".join(
+            f"<p>Chapter {i} explains a right triangle and its side lengths in a worked example.</p>"
+            for i in range(10)
+        )
+        source = (
+            "<article><h1>Pythagorean theorem</h1>"
+            + paragraphs
+            + "<p>The equation is <math><msup><mi>a</mi><mn>2</mn></msup>"
+            + "<mo>+</mo><msup><mi>b</mi><mn>2</mn></msup><mo>=</mo>"
+            + "<msup><mi>c</mi><mn>2</mn></msup></math>.</p></article>"
+        )
+        document = extract_document(
+            source.encode(), "text/html", "utf-8", "https://example.org/theorem"
+        )
+        self.assertIn("a^{2}+b^{2}=c^{2}", document["text"])
+        self.assertEqual(document["html_math"][0]["text"], "a^{2}+b^{2}=c^{2}")
+        self.assertIn("<math>", document["html_math"][0]["mathml"])
+        self.assertIn("/article", document["html_math"][0]["locator"])
+
+    def test_captcha_stops_repeated_search_and_reports_blocker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch(
+                "bot.PublicHTTP.fetch",
+                return_value=(b"<div class='anomaly-modal'>Challenge</div>", {"charset": "utf-8"}),
+            ) as fetch:
+                report, folder = run_bot(
+                    "đồ giả hàng nhái ở Việt Nam 2009-2016",
+                    Path(temporary),
+                    search_provider="duckduckgo",
+                )
+            self.assertEqual(fetch.call_count, 1)
+            self.assertEqual(report["status"], "incomplete")
+            self.assertIn("CAPTCHA", report["error"])
+            self.assertEqual(report["datasets"], [])
+            self.assertEqual(
+                len(json.loads((folder / "discovery.json").read_text())["searches"]), 1
+            )
 
     def test_domain_lookalike_not_trusted(self):
         self.assertEqual(source_priority("https://data.worldbank.org/")[0], 4)
