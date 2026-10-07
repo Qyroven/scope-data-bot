@@ -4,6 +4,17 @@ Bot CLI nhận **scope dữ liệu**, tự tìm nguồn → crawl → parse/chec
 
 Scope có thể là tài liệu khái niệm (định lý, giáo trình, nguyên lý vaccine) hoặc số liệu thống kê. Pipeline giữ raw source, metadata, locator và trace. Generic evidence luôn mang trạng thái review; việc index thành công không xác nhận số liệu đúng hoặc phạm vi đã đủ.
 
+## Một repo, giao diện Human in the Loop
+
+```bash
+./run-ui.sh
+# Mở http://127.0.0.1:8765
+```
+
+Launcher cài runtime UI đã khóa một lần; không clone repo khác. Cấu hình key trong Settings → tạo phiên và nhập scope → crawl/parse/check → đối chiếu bản gốc và duyệt → tạo index → lấy evidence cho chatbot. Tự duyệt mặc định tắt. Ưu tiên Docling nếu đã cài local; chạy `./setup-parser.sh` để cài OCR/layout, hoặc `DOCUMENT_PARSER=native ./run-ui.sh` để dùng parser nhẹ. CLI bên dưới vẫn dùng được riêng và không có bước duyệt UI.
+
+Tài liệu đầy đủ: [UI và API](review_ui/README.md). Bản duyệt giữ bảng/provenance; sửa text bỏ tọa độ cũ. Cache embedding dùng chung trong kho UI. Thu hồi/hết hiệu lực chặn index cũ; sang ngày mới không bắt rebuild nếu tập phiên bản còn hiệu lực không đổi. UI phát triển từ [Human Mind](https://github.com/SIReal3103/human-mind-rag); xem [nguồn gốc](NOTICE.md).
+
 ## Chạy
 
 Python 3.12 hoặc 3.14. SQLite phải có FTS5.

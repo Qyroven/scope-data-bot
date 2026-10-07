@@ -95,9 +95,9 @@ def plan_scope(brief):
         (key for key, aliases in COUNTRIES.items() if any(a in text for a in aliases)), None
     )
     years = sorted(set(int(y) for y in re.findall(r"\b(?:19|20)\d{2}\b", brief)))
-    if len(brief.strip()) < 12:
+    if len(brief.strip()) < 2 or re.fullmatch(r"(?:de|bai)\s+[a-z0-9]{1,2}", text):
         raise ValidationError(
-            "Scope quá ngắn: cần chủ đề, đối tượng và thời gian; không chỉ nhập 'đề F'."
+            "Scope chưa có chủ đề: hãy nêu nội dung cần thu thập, không chỉ nhập 'đề F'."
         )
     if len(brief) > 8000:
         raise ValidationError("Scope vượt 8000 ký tự: cần thu hẹp yêu cầu")

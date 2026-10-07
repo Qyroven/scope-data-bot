@@ -1,0 +1,1 @@
+The review UI, document lifecycle and model adapters in review_ui/ originate from Human Mind by SIReal3103: https://github.com/SIReal3103/human-mind-rag/tree/65c09690c21752f19476e60651cff5122afa9a7e . Integrated and adapted for the unified scope-data-bot application. Historical evaluation reports and runtime data are not included.
