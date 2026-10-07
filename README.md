@@ -4,6 +4,8 @@ Bot CLI nhận **scope dữ liệu**, tự tìm nguồn → crawl → parse/chec
 
 Scope có thể là tài liệu khái niệm (định lý, giáo trình, nguyên lý vaccine) hoặc số liệu thống kê. Pipeline giữ raw source, metadata, locator và trace. Generic evidence luôn mang trạng thái review; việc index thành công không xác nhận số liệu đúng hoặc phạm vi đã đủ.
 
+Truy vấn tìm nguồn được tạo theo loại scope: scope có mốc năm/số liệu ưu tiên nguồn thống kê, scope khái niệm ưu tiên giải thích/giáo trình. Nếu search bị CAPTCHA hoặc không thể trả kết quả, lượt chạy báo `incomplete` và ghi nguyên nhân trong `discovery.json`; không tự coi 0 nguồn là kết quả hợp lệ. Muốn crawl tự động cần search provider hoạt động và cấu hình model/key hợp lệ.
+
 ## Một repo, giao diện Human in the Loop
 
 ```bash
@@ -96,12 +98,12 @@ Embedding cache dùng lại vector khi provider/model/số chiều và văn bả
 
 ## Giới hạn hiện tại
 
-Parser nhẹ cho HTML/CSV/JSON; Docling local cho PDF, PNG/JPEG/TIFF/WebP một frame và DOCX/PPTX/XLSX. OCR EasyOCR vi/en, bảng TableFormer, CPU mặc định 2 threads. Docling mặc định xử lý 40 trang đầu, timeout cứng 180 giây, tối đa input 10 MB/500 trang PDF, output 600k ký tự/20 MB JSON; file Office có giới hạn giải nén, ảnh tối đa 20 MP. Timeout kết thúc cả nhóm tiến trình. Chưa có hard memory sandbox; không dùng trực tiếp cho upload không tin cậy từ nhiều tenant.
+Parser nhẹ cho HTML/CSV/JSON; Docling local cho PDF, PNG/JPEG/TIFF/WebP một frame và DOCX/PPTX/XLSX. HTML giữ article lead có thể bị readability bỏ sót và chuyển MathML thông dụng thành text tìm kiếm; `html_leads`/`html_math` giữ XPath cùng MathML gốc để đối chiếu. OCR EasyOCR vi/en, bảng TableFormer, CPU mặc định 2 threads. Docling mặc định xử lý 40 trang đầu, timeout cứng 180 giây, tối đa input 10 MB/500 trang PDF, output 600k ký tự/20 MB JSON; file Office có giới hạn giải nén, ảnh tối đa 20 MP. Timeout kết thúc cả nhóm tiến trình. Chưa có hard memory sandbox; không dùng trực tiếp cho upload không tin cậy từ nhiều tenant.
 
 `.env.example` yêu cầu Docling. `DOCUMENT_PARSER=auto` dùng Docling khi runtime đã cài; nếu chưa có thì PDF dùng pypdf và ghi hạn chế rõ, ảnh/Office báo cần setup. `--parser native` chọn pypdf. Native long PDF vẫn giữ tối đa 24 trang theo scope (scan tối đa 500 trang/45 giây). Cache parse local theo raw/config/worker/dependency-lock, không cache assessment; không bị lẫn scope. Cache không phải kho bằng chứng: từng run vẫn giữ raw/parsed và trace riêng.
 
-OCR có thể mất chữ hoặc đọc sai ô bảng; cần kiểm lại nguồn trước khi dùng số liệu. Cờ chất lượng và giá trị null không bảo đảm đã phát hiện mọi lỗi. Formula enrichment, mô tả ảnh/biểu đồ và chữ viết tay chưa được kiểm chứng; chưa bật các model enrichment nặng. Không có cam kết đọc đúng mọi công thức/bảng, hay mọi ngôn ngữ. Nguồn chặn/JavaScript/định dạng không hỗ trợ giữ lỗi. Tham khảo API sử dụng tại [Docling OCR](https://docling-project.github.io/docling/_generated/examples/full_page_ocr/) và [offline/local models](https://docling-project.github.io/docling/usage/advanced_options/).
+OCR có thể mất chữ hoặc đọc sai ô bảng; cần kiểm lại nguồn trước khi dùng số liệu. Cờ chất lượng và giá trị null không bảo đảm đã phát hiện mọi lỗi. Formula enrichment ngoài MathML, mô tả ảnh/biểu đồ và chữ viết tay chưa được kiểm chứng; chưa bật các model enrichment nặng. Không có cam kết đọc đúng mọi công thức/bảng, hay mọi ngôn ngữ. Nguồn chặn/JavaScript/định dạng không hỗ trợ giữ lỗi. Tham khảo API sử dụng tại [Docling OCR](https://docling-project.github.io/docling/_generated/examples/full_page_ocr/) và [offline/local models](https://docling-project.github.io/docling/usage/advanced_options/).
 
-Một writer cho mỗi run; operation đồng thời báo RUN_BUSY. Crash có thể để .data-lock, cần kiểm run trước khi xóa lock cũ. Exact vector search phù hợp corpus nhỏ. Đây là CLI đơn người dùng, chưa có UI, tenant ACL hoặc egress sandbox cho dịch vụ crawl công khai. Chỉ nhận nguồn công khai; không đưa tài liệu cá nhân vào repo.
+Một writer cho mỗi run; operation đồng thời báo RUN_BUSY. Crash có thể để .data-lock, cần kiểm run trước khi xóa lock cũ. Exact vector search phù hợp corpus nhỏ. UI hiện phục vụ một nhóm nhỏ tại local; chưa có tenant ACL hoặc egress sandbox cho dịch vụ crawl công khai. Chỉ nhận nguồn công khai; không đưa tài liệu cá nhân vào repo.
 
 Repo không chứa key, raw pages, vectors, private guide hay thư mục các lượt chạy. Public giữ code, hướng dẫn sử dụng, test hồi quy và CI. Báo cáo thử nghiệm, review và script chạy benchmark live giữ local trong `local-evidence/` (không được Git theo dõi). `benchmarks/vietnam-population-2020-2024.json` là dữ liệu đối chiếu mà connector World Bank sử dụng khi chạy; cần giữ cùng code. GitHub CI kiểm offline trên Python 3.12/3.14, không gọi inference bằng key thật.

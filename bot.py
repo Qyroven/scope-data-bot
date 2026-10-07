@@ -117,12 +117,19 @@ def plan_scope(brief):
         if v
     )
     query_subject = english if topic and country else subject
+    statistical = bool(
+        years
+        or re.search(
+            r"\b(?:ti le|ty le|so luong|so vu|thong ke|chi so|dataset|statistics|rate)\b",
+            text,
+        )
+    )
     queries = list(
         dict.fromkeys(
             [
-                query_subject + " statistics data",
-                subject + " số liệu thống kê",
-                query_subject + " dataset csv",
+                query_subject,
+                subject + (" số liệu thống kê" if statistical else " giáo trình giải thích"),
+                query_subject + (" dataset csv" if statistical else " tài liệu PDF"),
             ]
         )
     )
@@ -154,6 +161,7 @@ def plan_scope(brief):
         "country": country,
         "start_year": start,
         "end_year": end,
+        "scope_kind": "statistical" if statistical else "conceptual",
         "queries": queries,
         "terms": list(dict.fromkeys(terms)),
     }
@@ -491,12 +499,21 @@ def discover(http, plan, search_provider="auto"):
             http.folder.parent / "discovery.json",
             {"plan": plan, "searches": searches, "candidates": candidates},
         )
+        if "CAPTCHA" in entry.get("error", ""):
+            break
         if provider == "openai" and (
             "401" in entry.get("error", "")
             or "403" in entry.get("error", "")
             or "Chưa có key" in entry.get("error", "")
         ):
             break
+    if searches and not candidates and all(s["status"] == "failed" for s in searches):
+        reason = searches[-1].get("error", "Không có kết quả hợp lệ")
+        raise ValidationError(
+            "Không thể tìm nguồn: mọi truy vấn đã thất bại. "
+            + reason[:200]
+            + ". Xem discovery.json để kiểm tra từng truy vấn."
+        )
     if plan.get("planner") == "model" and candidates:
         from semantic import rank_request
 
@@ -706,8 +723,11 @@ def extract_document(body, content_type, charset, url, scope=None, parser_cache=
             for marker in ("cf-chl-", "verify you are human", "captcha-container")
         ):
             raise ValidationError("Trang challenge/CAPTCHA; chưa crawl được nội dung")
+        from parsing import html_article_leads, html_mathml_text, html_tables
+
+        readable_html, math_expressions = html_mathml_text(text_html)
         result = trafilatura.extract(
-            text_html,
+            readable_html,
             url=url,
             output_format="json",
             include_tables=True,
@@ -715,8 +735,6 @@ def extract_document(body, content_type, charset, url, scope=None, parser_cache=
             include_links=False,
             favor_precision=True,
         )
-        from parsing import html_tables
-
         tables = html_tables(text_html)
         useful_tables = any(t["row_count"] >= 2 and t["column_count"] >= 2 for t in tables)
         if not result and not useful_tables:
@@ -735,13 +753,36 @@ def extract_document(body, content_type, charset, url, scope=None, parser_cache=
         text = extracted.get("text", "")
         if len(text.strip()) < 150 and not useful_tables:
             raise ValidationError("Nội dung chính quá ngắn; không coi HTML shell là dữ liệu")
+        leads = [
+            lead
+            for lead in html_article_leads(text_html)
+            if folded(lead["text"]) not in folded(text)
+        ]
+        if leads:
+            prefix = "\n\n".join(lead["text"] for lead in leads)
+            for lead in leads:
+                lead["char_start"] = prefix.index(lead["text"])
+                lead["char_end"] = lead["char_start"] + len(lead["text"])
+            text = prefix + "\n\n" + text
+        missing_math = [
+            expression for expression in math_expressions if expression["text"] not in text
+        ]
+        if missing_math:
+            supplement = "\n\nCông thức MathML bổ sung từ trang gốc (cần đối chiếu XPath):\n"
+            for expression in missing_math:
+                supplement += f"{expression['text']} [{expression['locator']}]\n"
+            text += supplement
+        if len(text) > 600000:
+            raise ValidationError("HTML text vượt 600000 ký tự")
         return {
             "title": extracted.get("title") or parser.title,
             "text": text,
             "published_at": extracted.get("date"),
             "links": parser.links,
-            "parser": "trafilatura+html-tables-v1",
+            "parser": "trafilatura+html-tables-v2",
             "tables": tables,
+            "html_leads": leads,
+            "html_math": math_expressions,
         }
     if content_type in ("text/csv", "application/csv") or urllib.parse.urlsplit(url).path.endswith(
         ".csv"

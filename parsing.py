@@ -1,8 +1,87 @@
 """Local HTML table extraction. Cell strings and original locations stay intact."""
 
+import re
+
 from lxml import html
 
 from engine import ValidationError
+
+
+def html_article_leads(document):
+    """Capture article lead/summary blocks that readability extractors may omit."""
+    tree = html.fromstring(document)
+    for element in tree.xpath("//script|//style|//noscript|//svg"):
+        element.drop_tree()
+    leads = []
+    for element in tree.xpath("//article//*[@class]"):
+        classes = set(re.split(r"[\s_-]+", element.get("class", "").lower()))
+        if not classes.intersection({"lead", "brief", "sapo", "summary"}):
+            continue
+        text = " ".join(element.text_content().split())
+        if not 60 <= len(text) <= 2000 or any(lead["text"] == text for lead in leads):
+            continue
+        leads.append({"text": text, "locator": tree.getroottree().getpath(element)})
+        if len(leads) == 3:
+            break
+    return leads
+
+
+def html_mathml_text(document):
+    """Render bounded MathML into searchable text and retain the original markup."""
+    tree = html.fromstring(document)
+    maths = tree.xpath("//math[not(ancestor::math)]")
+    if len(maths) > 300:
+        raise ValidationError("HTML có quá 300 công thức; cần xử lý riêng và duyệt độ phủ")
+    locations = [(node, tree.getroottree().getpath(node)) for node in maths]
+    expressions = []
+
+    def render(node, depth=0):
+        if depth > 24:
+            raise ValidationError("MathML lồng quá sâu")
+        tag = node.tag.rsplit("}", 1)[-1].lower() if isinstance(node.tag, str) else ""
+        children = [
+            child
+            for child in node
+            if isinstance(child.tag, str) and child.tag.rsplit("}", 1)[-1] != "annotation-xml"
+        ]
+        if tag == "semantics":
+            return render(children[0], depth + 1) if children else ""
+        if tag in ("mi", "mn", "mo", "mtext"):
+            return " ".join("".join(node.itertext()).split())
+        values = [render(child, depth + 1) for child in children]
+        if tag == "msup" and len(values) >= 2:
+            return values[0] + "^{" + values[1] + "}"
+        if tag == "msub" and len(values) >= 2:
+            return values[0] + "_{" + values[1] + "}"
+        if tag == "msubsup" and len(values) >= 3:
+            return values[0] + "_{" + values[1] + "}^{" + values[2] + "}"
+        if tag == "mfrac" and len(values) >= 2:
+            return "(" + values[0] + ")/(" + values[1] + ")"
+        if tag == "msqrt":
+            return "sqrt(" + "".join(values) + ")"
+        if tag == "mroot" and len(values) >= 2:
+            return "root(" + values[0] + "," + values[1] + ")"
+        if tag == "mspace":
+            return " "
+        if tag == "mtr":
+            return "[" + ", ".join(values) + "]"
+        if tag == "mtable":
+            return "; ".join(values)
+        return "".join(values)
+
+    for node, locator in locations:
+        markup = html.tostring(node, encoding="unicode", with_tail=False)
+        if len(markup) > 8000:
+            raise ValidationError("MathML vượt giới hạn 8.000 ký tự")
+        value = " ".join(render(node).split())
+        if not value or len(value) > 500:
+            raise ValidationError("MathML không thể chuyển thành công thức ngắn để đối chiếu")
+        expressions.append({"text": value, "locator": locator, "mathml": markup})
+        replacement = html.Element("span")
+        replacement.text = " " + value + " "
+        replacement.tail = node.tail
+        node.getparent().replace(node, replacement)
+    return html.tostring(tree, encoding="unicode"), expressions
 
 
 def html_tables(document):

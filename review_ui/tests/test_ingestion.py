@@ -47,7 +47,7 @@ class LocalIngestionTests(unittest.TestCase):
         )
         parsed = ingestion.extract(html.encode(), "text/html; charset=utf-8", "huong-dan.html")
         self.assertIn(sentence.strip(), parsed["text"])
-        self.assertEqual(parsed["parser"], "trafilatura+html-tables-v1")
+        self.assertEqual(parsed["parser"], "trafilatura+html-tables-v2")
         self.assertNotIn("<article>", parsed["text"])
 
     def test_real_pdf_preserves_source_page_locators(self):
