@@ -14,3 +14,6 @@ runs/
 .data-lock/
 .ai-log/
 local-evidence/
+.pytest_cache/
+.review-data/
+.runtime/

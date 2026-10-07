@@ -379,6 +379,7 @@ def build(
     dimensions=1536,
     max_chunks=400,
     request_fn=embedding_request,
+    cache_path=None,
 ):
     folder = Path(folder).resolve()
     profile = provider()
@@ -403,7 +404,9 @@ def build(
                 trace, "data/chunks.json", [c["trace_id"] for c in chunks] or [stage["id"]], "chunk"
             )
         receipts, cache_hits = [], 0
-        cache = sqlite3.connect(folder.parent / "embedding-cache.sqlite")
+        cache = sqlite3.connect(
+            Path(cache_path) if cache_path else folder.parent / "embedding-cache.sqlite"
+        )
         cache.execute("CREATE TABLE IF NOT EXISTS cache(key TEXT PRIMARY KEY, vector TEXT)")
         try:
             with trace.stage("embedding", model, parents=[chunks_node["id"]]) as embedded:
